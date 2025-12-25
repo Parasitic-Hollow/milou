@@ -226,73 +226,42 @@ class HomeViewModel @Inject constructor(
         limit: Int,
         offset: Int
     ): List<DownloadableFileWithTags> {
-        val allResults = if (selectedTags.isEmpty() || tagMode == FilterMode.OR) {
-            val results = mutableListOf<DownloadableFileWithTags>()
-            if (consoles.isEmpty()) {
+        val requireAllTags = tagMode == FilterMode.AND && selectedTags.isNotEmpty()
+        
+        val results = mutableListOf<DownloadableFileWithTags>()
+        if (consoles.isEmpty()) {
+            results.addAll(repository.searchFilesWithTags(
+                query,
+                manufacturer = null,
+                consoleId = null,
+                tags = selectedTags,
+                sortAsc = sortAsc,
+                limit = limit,
+                offset = offset,
+                requireAllTags = requireAllTags
+            ))
+        } else {
+            consoles.forEach { consoleId ->
                 results.addAll(repository.searchFilesWithTags(
                     query,
                     manufacturer = null,
-                    consoleId = null,
+                    consoleId = consoleId,
                     tags = selectedTags,
                     sortAsc = sortAsc,
-                    limit = limit * 2, // Get more results to account for deduplication
-                    offset = offset
+                    limit = limit,
+                    offset = offset,
+                    requireAllTags = requireAllTags
                 ))
-            } else {
-                consoles.forEach { consoleId ->
-                    results.addAll(repository.searchFilesWithTags(
-                        query,
-                        manufacturer = null,
-                        consoleId = consoleId,
-                        tags = selectedTags,
-                        sortAsc = sortAsc,
-                        limit = limit * 2, // Get more results per console
-                        offset = offset
-                    ))
-                }
-            }
-            results.distinctBy { it.file.id }
-        } else {
-            val results = mutableListOf<DownloadableFileWithTags>()
-            if (consoles.isEmpty()) {
-                results.addAll(repository.searchFilesWithTags(
-                    query,
-                    manufacturer = null,
-                    consoleId = null,
-                    tags = emptySet(),
-                    sortAsc = sortAsc,
-                    limit = limit * 3, // Get more results for manual filtering
-                    offset = offset
-                ))
-            } else {
-                consoles.forEach { consoleId ->
-                    results.addAll(repository.searchFilesWithTags(
-                        query,
-                        manufacturer = null,
-                        consoleId = consoleId,
-                        tags = emptySet(),
-                        sortAsc = sortAsc,
-                        limit = limit * 3,
-                        offset = offset
-                    ))
-                }
-            }
-            results.distinctBy { it.file.id }
-        }
-        
-        val finalResults = if (selectedTags.isEmpty() || tagMode == FilterMode.OR) {
-            allResults
-        } else {
-            allResults.filter { fileWithTags ->
-                val fileTags = fileWithTags.tags.toSet()
-                selectedTags.all { selectedTag -> fileTags.contains(selectedTag) }
             }
         }
         
-        return finalResults.sortedWith(
-            compareBy<DownloadableFileWithTags> { if (sortAsc) it.file.name else "" }
-                .thenBy { if (!sortAsc) it.file.name else "" }
-        ).take(limit)
+        return results
+            .distinctBy { it.file.id }
+            .sortedWith(
+                compareBy<DownloadableFileWithTags> { if (sortAsc) it.file.name else "" }
+                    .thenBy { if (!sortAsc) it.file.name else "" }
+            )
+            .take(limit)
     }
     
     suspend fun startDownload(fileWithTags: DownloadableFileWithTags, context: Context) {

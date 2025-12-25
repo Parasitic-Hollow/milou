@@ -129,6 +129,43 @@ interface DownloadableFileDao {
         limit: Int = 100,
         offset: Int = 0
     ): List<DownloadableFileWithTagsResult>
+
+    /**
+     * Query files requiring ALL specified tags (AND logic).
+     * Uses GROUP BY with HAVING COUNT to ensure files have all requested tags.
+     */
+    @Query("""
+        SELECT df.id, df.name, df.fileName, df.consoleId, df.downloadUrl, df.fileSize, df.fileExtension, GROUP_CONCAT(t.tag, ',') as tags
+        FROM downloadable_files df
+        LEFT JOIN downloadable_file_tags t ON df.id = t.fileId
+        JOIN consoles c ON df.consoleId = c.id
+        JOIN manufacturers m ON c.manufacturerId = m.id
+        WHERE (:query = '*' OR df.name LIKE '%' || :query || '%')
+          AND (:manufacturer IS NULL OR m.name = :manufacturer)
+          AND (:consoleId IS NULL OR df.consoleId = :consoleId)
+          AND (:tagsCount = 0 OR df.id IN (
+                SELECT t2.fileId
+                FROM downloadable_file_tags t2
+                WHERE t2.tag IN (:tags)
+                GROUP BY t2.fileId
+                HAVING COUNT(DISTINCT t2.tag) = :tagsCount
+          ))
+        GROUP BY df.id, df.name, df.fileName, df.consoleId, df.downloadUrl, df.fileSize, df.fileExtension
+        ORDER BY
+            CASE WHEN :sortAsc = 1 THEN df.name END ASC,
+            CASE WHEN :sortAsc = 0 THEN df.name END DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun queryFilesWithAllTags(
+        query: String,
+        manufacturer: String?,
+        consoleId: String?,
+        tags: List<String>,
+        tagsCount: Int,
+        sortAsc: Boolean,
+        limit: Int = 100,
+        offset: Int = 0
+    ): List<DownloadableFileWithTagsResult>
 }
 
 data class DownloadableFileWithTagsResult(

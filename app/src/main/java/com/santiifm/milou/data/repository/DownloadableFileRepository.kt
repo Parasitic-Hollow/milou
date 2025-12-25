@@ -21,18 +21,32 @@ class DownloadableFileRepository @Inject constructor(
         tags: Set<String> = emptySet(),
         sortAsc: Boolean = true,
         limit: Int = 100,
-        offset: Int = 0
+        offset: Int = 0,
+        requireAllTags: Boolean = false
     ): List<DownloadableFileWithTags> {
-        val results = dao.queryFilesWithTags(
-            query = query.ifBlank { "*" },
-            manufacturer = manufacturer,
-            consoleId = consoleId,
-            tags = tags.toList(),
-            tagsCount = tags.size,
-            sortAsc = sortAsc,
-            limit = limit,
-            offset = offset
-        )
+        val results = if (requireAllTags && tags.isNotEmpty()) {
+            dao.queryFilesWithAllTags(
+                query = query.ifBlank { "*" },
+                manufacturer = manufacturer,
+                consoleId = consoleId,
+                tags = tags.toList(),
+                tagsCount = tags.size,
+                sortAsc = sortAsc,
+                limit = limit,
+                offset = offset
+            )
+        } else {
+            dao.queryFilesWithTags(
+                query = query.ifBlank { "*" },
+                manufacturer = manufacturer,
+                consoleId = consoleId,
+                tags = tags.toList(),
+                tagsCount = tags.size,
+                sortAsc = sortAsc,
+                limit = limit,
+                offset = offset
+            )
+        }
         
         return results.map { result ->
             DownloadableFileWithTags(
